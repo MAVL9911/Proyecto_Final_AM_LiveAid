@@ -22,9 +22,14 @@ function formatearDuracion(segundos: number): string {
 }
 
 export default function SesionCard({ sesion, onPress }: Props) {
-  const lista = sesion.estado === 'lista';
-  const colorEstado = lista ? colors.verde : colors.ambar;
-  const textoEstado = lista ? 'Transcripción lista' : 'Procesando…';
+  const colorEstado =
+    sesion.estado === 'lista' ? colors.verde : sesion.estado === 'error' ? colors.rojo : colors.ambar;
+  const textoEstado =
+    sesion.estado === 'lista'
+      ? 'Transcripción lista'
+      : sesion.estado === 'error'
+        ? 'Error al transcribir'
+        : 'Procesando…';
 
   return (
     <Pressable onPress={onPress} style={({ pressed }) => [styles.card, pressed && styles.presionada]}>

@@ -2,13 +2,14 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 
 // Cronómetro que calcula el tiempo con Date.now() (no suma de 1 en 1),
 // así no se desfasa si la app pasa a segundo plano. Soporta pausar y reanudar.
-export function useCronometro() {
+// Con autoInicio = false empieza detenido y arranca con reanudar().
+export function useCronometro(autoInicio = true) {
   // ms acumulados de los tramos anteriores (antes de la última pausa)
   const acumuladoRef = useRef(0);
   // momento en que empezó el tramo actual (null = en pausa)
-  const inicioRef = useRef<number | null>(Date.now());
+  const inicioRef = useRef<number | null>(autoInicio ? Date.now() : null);
 
-  const [corriendo, setCorriendo] = useState(true);
+  const [corriendo, setCorriendo] = useState(autoInicio);
   const [, setTick] = useState(0); // solo para volver a dibujar
 
   const msTotales = useCallback(() => {

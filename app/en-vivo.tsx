@@ -1,11 +1,13 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useEffect, useRef, useState } from 'react';
-import { Alert, BackHandler, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Alert, BackHandler, Linking, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Ondas from '../src/components/Ondas';
 import { useCronometro } from '../src/hooks/useCronometro';
+import { useGrabadora } from '../src/hooks/useGrabadora';
 import { guardarSesion } from '../src/storage';
+import { transcribirSesion } from '../src/transcripcion';
 import { Sesion } from '../src/types';
 import { colors, coloresMateria, fonts, fontSizes, radius, spacing } from '../src/theme';
 
@@ -22,15 +24,66 @@ function formatear(segundos: number): string {
 export default function EnVivo() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
-  const { segundos, corriendo, pausar, reanudar, obtenerSegundos } = useCronometro();
+  // El cronómetro empieza detenido: arranca solo cuando la grabación realmente inició
+  const { segundos, corriendo, pausar, reanudar, obtenerSegundos } = useCronometro(false);
+  const grabadora = useGrabadora();
   const [marcadores, setMarcadores] = useState<number[]>([]);
+  const [grabando, setGrabando] = useState(false); // la grabación ya inició
 
   // Evita que un doble toque abra dos alertas o ejecute la acción dos veces
   const alertaAbierta = useRef(false);
   const terminando = useRef(false);
+  const arrancado = useRef(false);
+  // Se guardan al detener, por si guardar falla y el usuario vuelve a intentar
+  const resultadoRef = useRef<{ uri: string | null; duracion: number } | null>(null);
+
+  // Al abrir la pantalla: pide permiso e inicia grabación y cronómetro juntos
+  useEffect(() => {
+    if (arrancado.current) return;
+    arrancado.current = true;
+    (async () => {
+      const resultado = await grabadora.iniciar();
+      if (resultado === 'ok') {
+        reanudar();
+        setGrabando(true);
+      } else if (resultado === 'denegado') {
+        Alert.alert(
+          'Micrófono desactivado',
+          'Sin el micrófono no se puede grabar la clase. Actívalo en los ajustes del teléfono para continuar.',
+          [
+            {
+              text: 'Abrir ajustes',
+              onPress: () => {
+                Linking.openSettings().catch(() => {});
+                router.replace('/');
+              },
+            },
+            { text: 'Volver', style: 'cancel', onPress: () => router.replace('/') },
+          ],
+          { cancelable: false }
+        );
+      } else {
+        Alert.alert('No se pudo grabar', 'No fue posible iniciar la grabación. Intenta de nuevo.', [
+          { text: 'Volver', onPress: () => router.replace('/') },
+        ]);
+      }
+    })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   function marcar() {
     setMarcadores((lista) => [...lista, obtenerSegundos()]);
+  }
+
+  function alternarPausa() {
+    if (!grabando) return;
+    if (corriendo) {
+      grabadora.pausar();
+      pausar();
+    } else {
+      grabadora.reanudar();
+      reanudar();
+    }
   }
 
   function confirmar(titulo: string, accion: () => void | Promise<void>, textoBoton: string) {
@@ -56,19 +109,30 @@ export default function EnVivo() {
   }
 
   function detener() {
+    if (!grabando) return;
     confirmar(
       '¿Detener la grabación?',
       async () => {
-        const duracion = obtenerSegundos();
+        // Detener la grabadora solo una vez (si guardar falla y se reintenta, se reutiliza)
+        if (!resultadoRef.current) {
+          const duracion = obtenerSegundos();
+          pausar();
+          const uri = await grabadora.detener();
+          resultadoRef.current = { uri, duracion };
+        }
+        const { uri, duracion } = resultadoRef.current;
+
         const sesion: Sesion = {
           id: Date.now().toString(),
           materia: MATERIA,
           color: COLOR_MATERIA,
           fechaISO: new Date().toISOString(),
           duracionSeg: duracion,
-          estado: 'procesando',
+          // Sin audio no hay nada que transcribir: se guarda con error y mensaje claro
+          estado: uri ? 'procesando' : 'error',
           marcadores,
           transcripcion: '',
+          ...(uri ? { audioUri: uri } : { errorMsg: 'No se pudo obtener el audio de la grabación.' }),
         };
         const guardada = await guardarSesion(sesion);
         if (!guardada) {
@@ -78,6 +142,12 @@ export default function EnVivo() {
           Alert.alert('No se pudo guardar', 'Intenta detener la grabación de nuevo.');
           return;
         }
+
+        // Transcribir en segundo plano: no se espera y no depende de esta pantalla
+        if (uri) {
+          transcribirSesion(sesion.id, uri);
+        }
+
         router.replace({
           pathname: '/guardada',
           params: { id: sesion.id, duracion: String(duracion), marcadores: String(marcadores.length) },
@@ -127,7 +197,7 @@ export default function EnVivo() {
 
       <View style={styles.controles}>
         <Pressable
-          onPress={corriendo ? pausar : reanudar}
+          onPress={alternarPausa}
           style={({ pressed }) => [styles.botonChico, styles.botonPausa, pressed && styles.presionado]}
         >
           <Ionicons name={corriendo ? 'pause' : 'play'} size={26} color={colors.texto} />
@@ -149,7 +219,7 @@ export default function EnVivo() {
       <View style={styles.panel}>
         <Text style={styles.panelTitulo}>Transcripción en vivo</Text>
         <ScrollView>
-          <Text style={styles.panelTexto}>La transcripción aparecerá aquí…</Text>
+          <Text style={styles.panelTexto}>Grabando… la transcripción aparecerá al terminar</Text>
         </ScrollView>
       </View>
     </View>

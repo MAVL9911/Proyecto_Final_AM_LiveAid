@@ -1,4 +1,4 @@
-export type EstadoSesion = 'lista' | 'procesando';
+export type EstadoSesion = 'lista' | 'procesando' | 'error';
 
 export type Sesion = {
   id: string;
@@ -8,7 +8,9 @@ export type Sesion = {
   duracionSeg: number;
   estado: EstadoSesion;
   marcadores: number[]; // segundos exactos del cronómetro
-  transcripcion: string; // vacío por ahora
+  transcripcion: string; // vacío hasta que termine la transcripción
+  audioUri?: string; // archivo .m4a grabado en el celular
+  errorMsg?: string; // motivo del error cuando estado === 'error'
   resumen?: string;
   notas?: string;
 };

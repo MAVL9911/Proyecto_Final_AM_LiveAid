@@ -24,7 +24,13 @@
     },
     "plugins": [
       "expo-router",
-      "expo-status-bar"
+      "expo-status-bar",
+      [
+        "expo-audio",
+        {
+          "microphonePermission": "LiveAid necesita el micrófono para grabar y transcribir tus clases."
+        }
+      ]
     ]
   }
 }

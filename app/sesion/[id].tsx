@@ -15,6 +15,7 @@ import {
 } from 'react-native';
 import { actualizarSesion, eliminarSesion, obtenerSesion } from '../../src/storage';
 import { colors, fonts, fontSizes, radius, spacing } from '../../src/theme';
+import { transcribirSesion } from '../../src/transcripcion';
 import { Sesion } from '../../src/types';
 
 type Pestana = 'resumen' | 'transcripcion' | 'notas';
@@ -27,6 +28,8 @@ const PESTANAS: { clave: Pestana; titulo: string }[] = [
 ];
 
 // Segundos -> mm:ss
+const AUDIO_NO_DISPONIBLE = 'El audio de esta sesión ya no está disponible. Graba de nuevo.';
+
 function formatearTiempo(segundos: number): string {
   const total = Math.max(0, Math.floor(segundos));
   const m = Math.floor(total / 60);
@@ -55,6 +58,17 @@ export default function DetalleSesion() {
   const temporizador = useRef<ReturnType<typeof setTimeout> | null>(null);
   const eliminando = useRef(false);
 
+  // Reintentar transcripción
+  const reintentando = useRef(false);
+  const [reintentandoUI, setReintentandoUI] = useState(false);
+  const montado = useRef(true);
+  useEffect(() => {
+    montado.current = true;
+    return () => {
+      montado.current = false;
+    };
+  }, []);
+
   useEffect(() => {
     let activo = true;
     obtenerSesion(String(id)).then((s) => {
@@ -69,6 +83,66 @@ export default function DetalleSesion() {
       activo = false;
     };
   }, [id]);
+
+  // Mientras la transcripción está en proceso, revisa cada 3 s si ya terminó (o falló)
+  const procesando = sesion?.estado === 'procesando';
+  useEffect(() => {
+    if (!procesando) return;
+    let activo = true;
+    const intervalo = setInterval(async () => {
+      const s = await obtenerSesion(String(id));
+      if (activo && s && s.estado !== 'procesando') setSesion(s);
+    }, 3000);
+    return () => {
+      activo = false;
+      clearInterval(intervalo);
+    };
+  }, [procesando, id]);
+
+  // Vuelve a transcribir el audio guardado (protegido contra doble toque)
+  async function reintentar() {
+    // Rastro de cada toque (sin imprimir la ruta del audio)
+    console.warn('reintentar:', sesion?.estado ?? 'sin sesión', 'audioUri:', sesion?.audioUri ? 'sí' : 'no');
+    if (reintentando.current || !sesion) return;
+    reintentando.current = true;
+    setReintentandoUI(true);
+    try {
+      const audioUri = sesion.audioUri;
+
+      // Sin audioUri o archivo inexistente: avisar en vez de no hacer nada
+      let existe = !!audioUri;
+      if (audioUri) {
+        try {
+          await fetch(audioUri);
+        } catch {
+          existe = false;
+        }
+      }
+      if (!audioUri || !existe) {
+        console.warn('reintentar: audio no disponible');
+        await fallar(AUDIO_NO_DISPONIBLE);
+        return;
+      }
+
+      // Se mantiene la caja de error en pantalla (con "Reintentando…") mientras trabaja
+      await transcribirSesion(String(id), audioUri);
+      await new Promise((r) => setTimeout(r, 400)); // que el estado "Reintentando…" alcance a verse
+      const actualizada = await obtenerSesion(String(id));
+      if (montado.current && actualizada) setSesion(actualizada);
+    } catch (e: any) {
+      await fallar(e?.message || 'No se pudo transcribir el audio.');
+    } finally {
+      // Siempre se libera, pase lo que pase, para que el botón no quede bloqueado
+      reintentando.current = false;
+      if (montado.current) setReintentandoUI(false);
+    }
+  }
+
+  // Guarda el error nuevo en la sesión y lo muestra
+  async function fallar(errorMsg: string) {
+    await actualizarSesion(String(id), { estado: 'error', errorMsg });
+    if (montado.current) setSesion((s) => (s ? { ...s, estado: 'error', errorMsg } : s));
+  }
 
   async function guardarNotas() {
     if (temporizador.current) {
@@ -142,7 +216,9 @@ export default function DetalleSesion() {
   }
 
   const lista = sesion.estado === 'lista';
-  const colorEstado = lista ? colors.verde : colors.ambar;
+  const conError = sesion.estado === 'error';
+  const colorEstado = lista ? colors.verde : conError ? colors.rojo : colors.ambar;
+  const textoEstado = lista ? 'Transcripción lista' : conError ? 'Error al transcribir' : 'Procesando…';
 
   return (
     <KeyboardAvoidingView
@@ -159,9 +235,7 @@ export default function DetalleSesion() {
             <Text style={styles.duracion}>{formatearTiempo(sesion.duracionSeg)}</Text>
             <View style={[styles.etiqueta, { borderColor: colorEstado }]}>
               <View style={[styles.punto, { backgroundColor: colorEstado }]} />
-              <Text style={[styles.textoEtiqueta, { color: colorEstado }]}>
-                {lista ? 'Transcripción lista' : 'Procesando…'}
-              </Text>
+              <Text style={[styles.textoEtiqueta, { color: colorEstado }]}>{textoEstado}</Text>
             </View>
           </View>
         </View>
@@ -238,10 +312,25 @@ export default function DetalleSesion() {
               )}
 
               <Text style={[styles.seccion, styles.seccionSeparada]}>Transcripción</Text>
-              {sesion.transcripcion.trim() === '' ? (
-                <Text style={styles.vacio}>La transcripción aún no está disponible</Text>
-              ) : (
+              {conError ? (
+                <View style={styles.errorCaja}>
+                  <Text style={styles.errorTexto}>
+                    {sesion.errorMsg || 'No se pudo transcribir el audio.'}
+                  </Text>
+                  <Pressable
+                    onPress={reintentar}
+                    disabled={reintentandoUI}
+                    style={[styles.boton, reintentandoUI && styles.botonDesactivado]}
+                  >
+                    <Text style={styles.textoBoton}>{reintentandoUI ? 'Reintentando…' : 'Reintentar'}</Text>
+                  </Pressable>
+                </View>
+              ) : lista && sesion.transcripcion.trim() !== '' ? (
                 <Text style={styles.cuerpo}>{sesion.transcripcion}</Text>
+              ) : lista ? (
+                <Text style={styles.vacio}>No se detectó voz en la grabación</Text>
+              ) : (
+                <Text style={styles.vacio}>La transcripción aún no está disponible</Text>
               )}
             </View>
           )}
@@ -319,6 +408,16 @@ const styles = StyleSheet.create({
     borderRadius: radius.lg,
     padding: spacing.lg,
   },
+  errorCaja: {
+    alignItems: 'center',
+    gap: spacing.md,
+    backgroundColor: colors.tarjeta,
+    borderWidth: 1,
+    borderColor: colors.rojo,
+    borderRadius: radius.md,
+    padding: spacing.lg,
+  },
+  errorTexto: { color: colors.rojo, fontSize: fontSizes.body, textAlign: 'center' },
   tarjetaTexto: { color: colors.textoSecundario, fontSize: fontSizes.body, textAlign: 'center' },
 
   notasContenedor: { flex: 1, padding: spacing.md },
