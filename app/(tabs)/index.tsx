@@ -51,7 +51,9 @@ export default function Inicio() {
 
   const clases = sesiones.length;
   const notas = sesiones.filter((s) => s.estado === 'lista').length;
-  const horas = sesiones.reduce((total, s) => total + s.duracionSeg, 0) / 3600;
+  const totalSeg = sesiones.reduce((total, s) => total + s.duracionSeg, 0);
+  // Menos de 1 hora: se muestra en minutos
+  const textoHoras = totalSeg < 3600 ? `${Math.round(totalSeg / 60)} min` : `${(totalSeg / 3600).toFixed(1)} h`;
   const racha = calcularRacha(sesiones);
 
   return (
@@ -63,7 +65,7 @@ export default function Inicio() {
         <View style={styles.stats}>
           <StatCard icono="mic" valor={String(clases)} etiqueta="Clases capturadas" color={colors.primario} />
           <StatCard icono="document-text" valor={String(notas)} etiqueta="Notas procesadas" color={colors.morado} />
-          <StatCard icono="time" valor={`${horas.toFixed(1)} h`} etiqueta="Horas de estudio" color={colors.azul} />
+          <StatCard icono="time" valor={textoHoras} etiqueta="Horas de estudio" color={colors.azul} />
           <StatCard icono="flame" valor={String(racha)} etiqueta="Racha de días" color={colors.ambar} />
         </View>
 

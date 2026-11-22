@@ -42,6 +42,16 @@ export async function guardarSesion(sesion: Sesion): Promise<boolean> {
   return escribirTodas([...todas.filter((s) => s.id !== sesion.id), sesion]);
 }
 
+// Borra una sesión por id. Devuelve true si se pudo guardar el cambio
+export async function eliminarSesion(id: string): Promise<boolean> {
+  try {
+    const todas = await leerTodas();
+    return escribirTodas(todas.filter((s) => s.id !== id));
+  } catch {
+    return false;
+  }
+}
+
 export async function actualizarSesion(id: string, cambios: Partial<Sesion>): Promise<boolean> {
   const todas = await leerTodas();
   const existe = todas.some((s) => s.id === id);
