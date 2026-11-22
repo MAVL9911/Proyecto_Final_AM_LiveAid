@@ -84,3 +84,58 @@ export async function transcribirAudio(uri: string): Promise<{ texto: string; se
     : [];
   return { texto: datos.texto, segmentos };
 }
+export type TipoContenido = 'resumen' | 'explicacion' | 'guia';
+
+const TIMEOUT_IA_MS = 70000;
+
+// Pide al backend un resumen, explicación o guía de estudio con Claude.
+// Devuelve el texto. Si algo falla lanza un Error con mensaje en español.
+export async function generarContenido(
+  transcripcion: string,
+  tipo: TipoContenido,
+  destacados: string[]
+): Promise<string> {
+  const controlador = new AbortController();
+  const temporizador = setTimeout(() => controlador.abort(), TIMEOUT_IA_MS);
+
+  let respuesta: Response;
+  try {
+    respuesta = await fetch(`${API_URL}/resumir`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ transcripcion, tipo, destacados }),
+      signal: controlador.signal,
+    });
+  } catch (e: any) {
+    clearTimeout(temporizador);
+    if (e?.name === 'AbortError') {
+      throw new Error('Tiempo agotado: la IA tardó demasiado en responder. Intenta de nuevo.');
+    }
+    throw new Error('Sin respuesta del servidor. Revisa tu internet e intenta de nuevo.');
+  }
+
+  try {
+    let datos: any = null;
+    try {
+      datos = await respuesta.json();
+    } catch {
+      datos = null;
+    }
+
+    if (!respuesta.ok) {
+      const detalle = typeof datos?.error === 'string' ? datos.error : 'El servidor respondió con un error.';
+      throw new Error(`Error del servidor (${respuesta.status}): ${detalle}`);
+    }
+    if (typeof datos?.texto !== 'string' || datos.texto.trim() === '') {
+      throw new Error('El servidor devolvió una respuesta inesperada.');
+    }
+    return datos.texto;
+  } catch (e: any) {
+    if (e?.name === 'AbortError') {
+      throw new Error('Tiempo agotado: la IA tardó demasiado en responder. Intenta de nuevo.');
+    }
+    throw e;
+  } finally {
+    clearTimeout(temporizador);
+  }
+}

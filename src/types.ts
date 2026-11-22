@@ -16,5 +16,7 @@ export type Sesion = {
   audioUri?: string; // archivo .m4a grabado en el celular
   errorMsg?: string; // motivo del error cuando estado === 'error'
   resumen?: string;
+  explicacion?: string;
+  guia?: string;
   notas?: string;
 };

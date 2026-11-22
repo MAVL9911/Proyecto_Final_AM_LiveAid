@@ -13,7 +13,9 @@ import {
   TextInput,
   View,
 } from 'react-native';
+import { generarContenido, TipoContenido } from '../../src/api';
 import TranscripcionConTiempos from '../../src/components/TranscripcionConTiempos';
+import { segmentoDeMarcador } from '../../src/marcadores';
 import { actualizarSesion, eliminarSesion, obtenerSesion } from '../../src/storage';
 import { colors, fonts, fontSizes, radius, spacing } from '../../src/theme';
 import { transcribirSesion } from '../../src/transcripcion';
@@ -26,6 +28,12 @@ const PESTANAS: { clave: Pestana; titulo: string }[] = [
   { clave: 'resumen', titulo: 'Resumen IA' },
   { clave: 'transcripcion', titulo: 'Transcripción' },
   { clave: 'notas', titulo: 'Mis notas' },
+];
+
+const TIPOS_IA: { clave: TipoContenido; titulo: string; boton: string }[] = [
+  { clave: 'resumen', titulo: 'Resumen', boton: 'Generar resumen' },
+  { clave: 'explicacion', titulo: 'Explicación', boton: 'Generar explicación' },
+  { clave: 'guia', titulo: 'Guía de estudio', boton: 'Generar guía' },
 ];
 
 // Segundos -> mm:ss
@@ -62,6 +70,11 @@ export default function DetalleSesion() {
   // Reintentar transcripción
   const reintentando = useRef(false);
   const [reintentandoUI, setReintentandoUI] = useState(false);
+  // Contenido de IA
+  const [tipoIA, setTipoIA] = useState<TipoContenido>('resumen');
+  const [generando, setGenerando] = useState<TipoContenido | null>(null);
+  const [errorIA, setErrorIA] = useState<{ tipo: TipoContenido; mensaje: string } | null>(null);
+  const generandoRef = useRef(false);
   const montado = useRef(true);
   useEffect(() => {
     montado.current = true;
@@ -136,6 +149,39 @@ export default function DetalleSesion() {
       // Siempre se libera, pase lo que pase, para que el botón no quede bloqueado
       reintentando.current = false;
       if (montado.current) setReintentandoUI(false);
+    }
+  }
+
+  // Frases marcadas por el usuario (sin repetir). Sin segmentos: lista vacía.
+  function calcularDestacados(s: Sesion): string[] {
+    const segs = s.segmentos ?? [];
+    if (segs.length === 0) return [];
+    const textos: string[] = [];
+    for (const marca of s.marcadores) {
+      const i = segmentoDeMarcador(segs, marca);
+      const texto = i >= 0 ? segs[i].texto.trim() : '';
+      if (texto && !textos.includes(texto)) textos.push(texto);
+    }
+    return textos;
+  }
+
+  // Genera resumen / explicación / guía con la IA (protegido contra doble toque)
+  async function generar(tipo: TipoContenido) {
+    if (generandoRef.current || !sesion) return;
+    if (sesion.estado !== 'lista' || sesion.transcripcion.trim() === '') return;
+    generandoRef.current = true;
+    setGenerando(tipo);
+    setErrorIA(null);
+    try {
+      const texto = await generarContenido(sesion.transcripcion, tipo, calcularDestacados(sesion));
+      // Se guarda aunque el usuario ya haya salido de la pantalla
+      await actualizarSesion(String(id), { [tipo]: texto });
+      if (montado.current) setSesion((s) => (s ? { ...s, [tipo]: texto } : s));
+    } catch (e: any) {
+      if (montado.current) setErrorIA({ tipo, mensaje: e?.message || 'No se pudo generar el contenido.' });
+    } finally {
+      generandoRef.current = false;
+      if (montado.current) setGenerando(null);
     }
   }
 
@@ -221,6 +267,20 @@ export default function DetalleSesion() {
   const colorEstado = lista ? colors.verde : conError ? colors.rojo : colors.ambar;
   const textoEstado = lista ? 'Transcripción lista' : conError ? 'Error al transcribir' : 'Procesando…';
 
+  // Contenido de IA del tipo seleccionado
+  const puedeGenerar = lista && sesion.transcripcion.trim() !== '';
+  const motivoBloqueo =
+    sesion.estado === 'procesando'
+      ? 'Procesando la transcripción…'
+      : conError
+      ? 'La transcripción falló: reinténtala en la pestaña Transcripción'
+      : 'Aún no hay transcripción';
+  const infoIA = TIPOS_IA.find((t) => t.clave === tipoIA)!;
+  const contenidoIA = sesion[tipoIA];
+  const generandoEste = generando === tipoIA;
+  const errorEste = errorIA?.tipo === tipoIA ? errorIA.mensaje : null;
+  const bloqueado = !puedeGenerar || generando !== null;
+
   return (
     <KeyboardAvoidingView
       style={styles.container}
@@ -281,18 +341,52 @@ export default function DetalleSesion() {
         </View>
       ) : (
         <ScrollView contentContainerStyle={styles.scroll} keyboardShouldPersistTaps="handled">
-          {pestana === 'resumen' &&
-            (sesion.resumen ? (
-              <Text style={styles.cuerpo}>{sesion.resumen}</Text>
-            ) : (
+          {pestana === 'resumen' && (
+            <View style={styles.bloqueIA}>
+              <View style={styles.selector}>
+                {TIPOS_IA.map((t) => {
+                  const activo = tipoIA === t.clave;
+                  return (
+                    <Pressable
+                      key={t.clave}
+                      onPress={() => setTipoIA(t.clave)}
+                      style={[styles.opcion, activo && styles.opcionActiva]}
+                    >
+                      <Text style={[styles.textoOpcion, activo && styles.textoOpcionActiva]}>{t.titulo}</Text>
+                    </Pressable>
+                  );
+                })}
+              </View>
+
+              {!!contenidoIA && (
+                <Text selectable style={styles.cuerpo}>
+                  {contenidoIA}
+                </Text>
+              )}
+
               <View style={styles.tarjeta}>
-                <Ionicons name="sparkles-outline" size={28} color={colors.primario} />
-                <Text style={styles.tarjetaTexto}>El resumen se generará cuando la transcripción esté lista</Text>
-                <Pressable disabled style={[styles.boton, styles.botonDesactivado]}>
-                  <Text style={styles.textoBoton}>Generar resumen</Text>
+                {!contenidoIA && <Ionicons name="sparkles-outline" size={28} color={colors.primario} />}
+                {!puedeGenerar && <Text style={styles.tarjetaTexto}>{motivoBloqueo}</Text>}
+                {errorEste && <Text style={styles.errorTexto}>{errorEste}</Text>}
+                <Pressable
+                  onPress={() => generar(tipoIA)}
+                  disabled={bloqueado}
+                  style={[styles.boton, styles.botonIA, bloqueado && styles.botonDesactivado]}
+                >
+                  {generandoEste && <ActivityIndicator color={colors.sobrePrimario} />}
+                  <Text style={styles.textoBoton}>
+                    {generandoEste
+                      ? 'Generando…'
+                      : errorEste
+                      ? 'Reintentar'
+                      : contenidoIA
+                      ? 'Regenerar'
+                      : infoIA.boton}
+                  </Text>
                 </Pressable>
               </View>
-            ))}
+            </View>
+          )}
 
           {pestana === 'transcripcion' && (
             <View>
@@ -424,6 +518,22 @@ const styles = StyleSheet.create({
     padding: spacing.lg,
   },
   errorTexto: { color: colors.rojo, fontSize: fontSizes.body, textAlign: 'center' },
+  bloqueIA: { gap: spacing.md },
+  selector: { flexDirection: 'row', gap: spacing.sm },
+  opcion: {
+    flex: 1,
+    alignItems: 'center',
+    paddingVertical: spacing.sm + 2,
+    paddingHorizontal: spacing.xs,
+    backgroundColor: colors.tarjeta,
+    borderWidth: 1,
+    borderColor: colors.borde,
+    borderRadius: radius.lg * 2,
+  },
+  opcionActiva: { borderColor: colors.primario },
+  textoOpcion: { color: colors.textoSecundario, fontSize: fontSizes.small, textAlign: 'center' },
+  textoOpcionActiva: { color: colors.primario, fontWeight: '700' },
+  botonIA: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: spacing.sm },
   tarjetaTexto: { color: colors.textoSecundario, fontSize: fontSizes.body, textAlign: 'center' },
 
   notasContenedor: { flex: 1, padding: spacing.md },
