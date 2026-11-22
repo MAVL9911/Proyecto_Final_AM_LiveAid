@@ -1,5 +1,8 @@
 export type EstadoSesion = 'lista' | 'procesando' | 'error';
 
+// Una frase de la transcripción con su tiempo (en segundos).
+export type Segmento = { inicio: number; fin: number; texto: string };
+
 export type Sesion = {
   id: string;
   materia: string;
@@ -9,6 +12,7 @@ export type Sesion = {
   estado: EstadoSesion;
   marcadores: number[]; // segundos exactos del cronómetro
   transcripcion: string; // vacío hasta que termine la transcripción
+  segmentos?: Segmento[]; // frases con tiempos (sesiones nuevas)
   audioUri?: string; // archivo .m4a grabado en el celular
   errorMsg?: string; // motivo del error cuando estado === 'error'
   resumen?: string;

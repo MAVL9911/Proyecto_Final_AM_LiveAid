@@ -11,8 +11,8 @@ export async function transcribirSesion(id: string, audioUri: string): Promise<v
   if (enCurso.has(id)) return;
   enCurso.add(id);
   try {
-    const transcripcion = await transcribirAudio(audioUri);
-    await actualizarSesion(id, { transcripcion, estado: 'lista', errorMsg: undefined });
+    const { texto, segmentos } = await transcribirAudio(audioUri);
+    await actualizarSesion(id, { transcripcion: texto, segmentos, estado: 'lista', errorMsg: undefined });
   } catch (e: any) {
     const errorMsg = e?.message || 'No se pudo transcribir el audio.';
     await actualizarSesion(id, { estado: 'error', errorMsg });

@@ -13,6 +13,7 @@ import {
   TextInput,
   View,
 } from 'react-native';
+import TranscripcionConTiempos from '../../src/components/TranscripcionConTiempos';
 import { actualizarSesion, eliminarSesion, obtenerSesion } from '../../src/storage';
 import { colors, fonts, fontSizes, radius, spacing } from '../../src/theme';
 import { transcribirSesion } from '../../src/transcripcion';
@@ -326,7 +327,12 @@ export default function DetalleSesion() {
                   </Pressable>
                 </View>
               ) : lista && sesion.transcripcion.trim() !== '' ? (
-                <Text style={styles.cuerpo}>{sesion.transcripcion}</Text>
+                sesion.segmentos && sesion.segmentos.length > 0 ? (
+                  <TranscripcionConTiempos segmentos={sesion.segmentos} marcadores={sesion.marcadores} />
+                ) : (
+                  // Sesiones anteriores sin segmentos: texto corrido como antes
+                  <Text style={styles.cuerpo}>{sesion.transcripcion}</Text>
+                )
               ) : lista ? (
                 <Text style={styles.vacio}>No se detectó voz en la grabación</Text>
               ) : (

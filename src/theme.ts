@@ -7,6 +7,7 @@ export const colors = {
   texto: '#F3F4F6',
   textoSecundario: '#9CA3AF',
   primario: '#FF7A59',
+  primarioSuave: 'rgba(255, 122, 89, 0.10)', // fondo suave para resaltar marcadores
   morado: '#A855F7',
   azul: '#3B82F6',
   ambar: '#F59E0B',

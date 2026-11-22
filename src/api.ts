@@ -1,4 +1,5 @@
 import { API_URL } from './config';
+import { Segmento } from './types';
 
 const TIMEOUT_MS = 60000;
 
@@ -30,9 +31,9 @@ function enviarAudio(uri: string): Promise<{ estado: number; cuerpo: string }> {
   });
 }
 
-// Manda el audio al backend y devuelve el texto transcrito.
+// Manda el audio al backend y devuelve el texto transcrito y sus segmentos con tiempos.
 // Si algo falla lanza un Error con un mensaje en español listo para mostrar.
-export async function transcribirAudio(uri: string): Promise<string> {
+export async function transcribirAudio(uri: string): Promise<{ texto: string; segmentos: Segmento[] }> {
   // Caso: archivo de audio no encontrado o ilegible (solo se leen los encabezados).
   try {
     if (!uri) throw new Error('uri vacía');
@@ -74,5 +75,12 @@ export async function transcribirAudio(uri: string): Promise<string> {
     registrarError(new Error('Respuesta sin campo "texto"'), uri, resultado.estado);
     throw new Error('El servidor devolvió una respuesta inesperada.');
   }
-  return datos.texto;
+  // Si el servidor no manda segmentos (o vienen mal), quedan como [].
+  const segmentos: Segmento[] = Array.isArray(datos.segmentos)
+    ? datos.segmentos.filter(
+        (s: any) =>
+          s && typeof s.inicio === 'number' && typeof s.fin === 'number' && typeof s.texto === 'string'
+      )
+    : [];
+  return { texto: datos.texto, segmentos };
 }
