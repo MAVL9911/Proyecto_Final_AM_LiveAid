@@ -61,7 +61,8 @@ app.post('/transcribir', upload.single('audio'), async (req, res) => {
     );
     formulario.append('model', 'whisper-large-v3-turbo');
     formulario.append('language', 'es');
-    formulario.append('response_format', 'json');
+    formulario.append('response_format', 'verbose_json');
+    formulario.append('timestamp_granularities[]', 'segment');
 
     const respuesta = await fetch(GROQ_URL, {
       method: 'POST',
@@ -85,7 +86,21 @@ app.post('/transcribir', upload.single('audio'), async (req, res) => {
     }
 
     const datos = await respuesta.json();
-    return res.json({ texto: datos.text || '' });
+    const texto = typeof datos.text === 'string' ? datos.text.trim() : '';
+
+    // Segmentos con tiempos (segundos, 1 decimal). Si Groq no los manda, queda [].
+    const redondear = (n) => Math.round((Number(n) || 0) * 10) / 10;
+    const segmentos = Array.isArray(datos.segments)
+      ? datos.segments
+          .map((s) => ({
+            inicio: redondear(s && s.start),
+            fin: redondear(s && s.end),
+            texto: s && typeof s.text === 'string' ? s.text.trim() : '',
+          }))
+          .filter((s) => s.texto !== '')
+      : [];
+
+    return res.json({ texto, segmentos });
   } catch (error) {
     if (error.name === 'AbortError') {
       console.error('Timeout al llamar a Groq (30 s)');
