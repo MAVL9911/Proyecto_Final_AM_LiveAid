@@ -15,6 +15,12 @@ function formatearFecha(iso: string): string {
   return `${dia} · ${hora}`;
 }
 
+function formatearDuracion(segundos: number): string {
+  const m = Math.floor(segundos / 60);
+  const s = segundos % 60;
+  return `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
+}
+
 export default function SesionCard({ sesion, onPress }: Props) {
   const lista = sesion.estado === 'lista';
   const colorEstado = lista ? colors.verde : colors.ambar;
@@ -28,7 +34,7 @@ export default function SesionCard({ sesion, onPress }: Props) {
           {sesion.materia}
         </Text>
         <Text style={styles.detalle}>
-          {formatearFecha(sesion.fecha)} · <Text style={styles.mono}>{sesion.duracionMin} min</Text>
+          {formatearFecha(sesion.fechaISO)} · <Text style={styles.mono}>{formatearDuracion(sesion.duracionSeg)}</Text>
         </Text>
         <View style={styles.fila}>
           <View style={[styles.etiqueta, { borderColor: colorEstado }]}>
@@ -37,7 +43,7 @@ export default function SesionCard({ sesion, onPress }: Props) {
           </View>
           <View style={styles.marcadores}>
             <Ionicons name="bookmark" size={14} color={colors.primario} />
-            <Text style={styles.detalle}>{sesion.marcadores}</Text>
+            <Text style={styles.detalle}>{sesion.marcadores.length}</Text>
           </View>
         </View>
       </View>

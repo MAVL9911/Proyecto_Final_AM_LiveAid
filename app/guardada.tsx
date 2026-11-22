@@ -11,7 +11,7 @@ function formatear(segundos: number): string {
 
 export default function Guardada() {
   const router = useRouter();
-  const { duracion, marcadores } = useLocalSearchParams<{ duracion?: string; marcadores?: string }>();
+  const { id, duracion, marcadores } = useLocalSearchParams<{ id?: string; duracion?: string; marcadores?: string }>();
   const segundos = Number(duracion) || 0;
   const numMarcadores = Number(marcadores) || 0;
 
@@ -39,7 +39,7 @@ export default function Guardada() {
       </View>
 
       <Pressable
-        onPress={() => router.replace('/sesion/1')}
+        onPress={() => router.replace(`/sesion/${id}`)}
         style={({ pressed }) => [styles.botonPrincipal, pressed && styles.presionado]}
       >
         <Text style={styles.textoPrincipal}>Ver sesión</Text>

@@ -5,10 +5,13 @@ import { Alert, BackHandler, Pressable, ScrollView, StyleSheet, Text, View } fro
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Ondas from '../src/components/Ondas';
 import { useCronometro } from '../src/hooks/useCronometro';
-import { colors, fonts, fontSizes, radius, spacing } from '../src/theme';
+import { guardarSesion } from '../src/storage';
+import { Sesion } from '../src/types';
+import { colors, coloresMateria, fonts, fontSizes, radius, spacing } from '../src/theme';
 
 // Luego vendrá de la materia elegida
 const MATERIA = 'Cálculo Diferencial e Integral';
+const COLOR_MATERIA = coloresMateria[0];
 
 function formatear(segundos: number): string {
   const m = Math.floor(segundos / 60);
@@ -30,7 +33,7 @@ export default function EnVivo() {
     setMarcadores((lista) => [...lista, obtenerSegundos()]);
   }
 
-  function confirmar(titulo: string, accion: () => void, textoBoton: string) {
+  function confirmar(titulo: string, accion: () => void | Promise<void>, textoBoton: string) {
     if (alertaAbierta.current || terminando.current) return;
     alertaAbierta.current = true;
     Alert.alert(
@@ -55,11 +58,31 @@ export default function EnVivo() {
   function detener() {
     confirmar(
       '¿Detener la grabación?',
-      () =>
+      async () => {
+        const duracion = obtenerSegundos();
+        const sesion: Sesion = {
+          id: Date.now().toString(),
+          materia: MATERIA,
+          color: COLOR_MATERIA,
+          fechaISO: new Date().toISOString(),
+          duracionSeg: duracion,
+          estado: 'procesando',
+          marcadores,
+          transcripcion: '',
+        };
+        const guardada = await guardarSesion(sesion);
+        if (!guardada) {
+          // No se pudo guardar: avisar y permitir intentar de nuevo
+          terminando.current = false;
+          alertaAbierta.current = false;
+          Alert.alert('No se pudo guardar', 'Intenta detener la grabación de nuevo.');
+          return;
+        }
         router.replace({
           pathname: '/guardada',
-          params: { duracion: String(obtenerSegundos()), marcadores: String(marcadores.length) },
-        }),
+          params: { id: sesion.id, duracion: String(duracion), marcadores: String(marcadores.length) },
+        });
+      },
       'Detener'
     );
   }

@@ -1,9 +1,10 @@
 import { Ionicons } from '@expo/vector-icons';
-import { useRouter } from 'expo-router';
+import { useFocusEffect, useRouter } from 'expo-router';
+import { useCallback, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import SesionCard from '../../src/components/SesionCard';
 import StatCard from '../../src/components/StatCard';
-import { sesionesEjemplo } from '../../src/data/ejemplo';
+import { listarSesiones } from '../../src/storage';
 import { colors, fonts, fontSizes, radius, spacing } from '../../src/theme';
 import { Sesion } from '../../src/types';
 
@@ -21,7 +22,7 @@ function fechaHoy(): string {
 
 // Días seguidos (hasta hoy) con al menos una sesión
 function calcularRacha(sesiones: Sesion[]): number {
-  const dias = new Set(sesiones.map((s) => new Date(s.fecha).toDateString()));
+  const dias = new Set(sesiones.map((s) => new Date(s.fechaISO).toDateString()));
   let racha = 0;
   const dia = new Date();
   while (dias.has(dia.toDateString())) {
@@ -33,11 +34,24 @@ function calcularRacha(sesiones: Sesion[]): number {
 
 export default function Inicio() {
   const router = useRouter();
-  const sesiones = sesionesEjemplo;
+  const [sesiones, setSesiones] = useState<Sesion[]>([]);
+
+  // Recarga las sesiones cada vez que la pantalla gana foco
+  useFocusEffect(
+    useCallback(() => {
+      let activo = true;
+      listarSesiones().then((lista) => {
+        if (activo) setSesiones(lista);
+      });
+      return () => {
+        activo = false;
+      };
+    }, [])
+  );
 
   const clases = sesiones.length;
   const notas = sesiones.filter((s) => s.estado === 'lista').length;
-  const horas = sesiones.reduce((total, s) => total + s.duracionMin, 0) / 60;
+  const horas = sesiones.reduce((total, s) => total + s.duracionSeg, 0) / 3600;
   const racha = calcularRacha(sesiones);
 
   return (
@@ -58,7 +72,7 @@ export default function Inicio() {
           <Text style={styles.vacio}>Aún no tienes sesiones, toca Nueva sesión para empezar</Text>
         ) : (
           <View style={styles.lista}>
-            {sesiones.map((s) => (
+            {sesiones.slice(0, 3).map((s) => (
               <SesionCard key={s.id} sesion={s} onPress={() => router.push(`/sesion/${s.id}`)} />
             ))}
           </View>
