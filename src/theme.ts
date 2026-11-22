@@ -12,6 +12,8 @@ export const colors = {
   ambar: '#F59E0B',
   verde: '#22C55E',
   rojo: '#EF4444',
+  sobrePrimario: '#FFFFFF', // texto sobre el color principal
+  sombra: '#000000',
 };
 
 // Colores por materia (en orden)
