@@ -78,7 +78,7 @@ export default function Inicio() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.fondo },
-  scroll: { padding: spacing.md, paddingBottom: 100 },
+  scroll: { padding: spacing.md, paddingBottom: 120 },
   saludo: { color: colors.texto, fontFamily: fonts.titulo, fontSize: fontSizes.titulo },
   fecha: { color: colors.textoSecundario, fontSize: fontSizes.body, marginTop: spacing.xs },
   stats: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.md, marginTop: spacing.lg },

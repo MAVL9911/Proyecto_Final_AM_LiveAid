@@ -14,9 +14,12 @@ export default function RootLayout() {
         }}
       >
         <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-        <Stack.Screen name="en-vivo" options={{ title: 'En vivo' }} />
-        <Stack.Screen name="guardada" options={{ title: 'Sesión guardada' }} />
-        <Stack.Screen name="sesion/[id]" options={{ title: 'Detalle de sesión' }} />
+        <Stack.Screen name="en-vivo" options={{ headerShown: false, gestureEnabled: false }} />
+        <Stack.Screen name="guardada" options={{ headerShown: false, gestureEnabled: false }} />
+        <Stack.Screen
+          name="sesion/[id]"
+          options={{ title: 'Detalle de sesión', headerBackTitle: 'Inicio' }}
+        />
       </Stack>
     </>
   );
