@@ -1,7 +1,10 @@
 import { API_URL } from './config';
 import { Segmento } from './types';
 
-const TIMEOUT_MS = 60000;
+const TIMEOUT_MS = 90000;
+
+// Render gratis se duerme: la primera petición puede tardar en despertarlo.
+const MENSAJE_TIEMPO = 'El servidor tardó en despertar. Intenta de nuevo en unos segundos.';
 
 // Llave compartida con el backend (encabezado x-app-key).
 const APP_KEY = process.env.EXPO_PUBLIC_APP_KEY ?? '';
@@ -60,7 +63,7 @@ export async function transcribirAudio(uri: string): Promise<{ texto: string; se
   } catch (e: any) {
     registrarError(e, uri);
     if (e?.message === 'TIEMPO') {
-      throw new Error('Tiempo agotado: el servidor tardó demasiado en responder. Intenta de nuevo.');
+      throw new Error(MENSAJE_TIEMPO);
     }
     if (e?.message === 'RED') {
       throw new Error('Sin respuesta del servidor. Revisa tu internet e intenta de nuevo.');
@@ -99,7 +102,7 @@ export async function transcribirAudio(uri: string): Promise<{ texto: string; se
 }
 export type TipoContenido = 'resumen' | 'explicacion' | 'guia';
 
-const TIMEOUT_IA_MS = 70000;
+const TIMEOUT_IA_MS = 90000;
 
 // Pide al backend un resumen, explicación o guía de estudio con Claude.
 // Devuelve el texto. Si algo falla lanza un Error con mensaje en español.
@@ -122,7 +125,7 @@ export async function generarContenido(
   } catch (e: any) {
     clearTimeout(temporizador);
     if (e?.name === 'AbortError') {
-      throw new Error('Tiempo agotado: la IA tardó demasiado en responder. Intenta de nuevo.');
+      throw new Error(MENSAJE_TIEMPO);
     }
     throw new Error('Sin respuesta del servidor. Revisa tu internet e intenta de nuevo.');
   }
@@ -147,7 +150,7 @@ export async function generarContenido(
     return datos.texto;
   } catch (e: any) {
     if (e?.name === 'AbortError') {
-      throw new Error('Tiempo agotado: la IA tardó demasiado en responder. Intenta de nuevo.');
+      throw new Error(MENSAJE_TIEMPO);
     }
     throw e;
   } finally {

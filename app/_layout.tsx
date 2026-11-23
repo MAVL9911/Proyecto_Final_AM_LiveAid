@@ -1,8 +1,19 @@
 import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
+import { useEffect } from 'react';
+import { API_URL } from '../src/config';
 import { colors } from '../src/theme';
 
 export default function RootLayout() {
+  // Llamada silenciosa para despertar el servidor de Render (se ignora cualquier fallo).
+  useEffect(() => {
+    try {
+      fetch(`${API_URL}/salud`).catch(() => {});
+    } catch {
+      // se ignora
+    }
+  }, []);
+
   return (
     <>
       <StatusBar style="light" />

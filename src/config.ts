@@ -1,3 +1,2 @@
-// URL del backend. Por ahora es la IP de la computadora en la red local (el celular y la
-// computadora deben estar en el mismo Wi-Fi). Más adelante será la URL del servidor publicado.
-export const API_URL = 'http://192.168.1.74:3000';
+// URL del backend: la de EXPO_PUBLIC_API_URL si existe; si no, el servidor publicado en Render.
+export const API_URL = process.env.EXPO_PUBLIC_API_URL || 'https://liveaid-server.onrender.com';
