@@ -3,8 +3,11 @@ export type EstadoSesion = 'lista' | 'procesando' | 'error';
 // Una frase de la transcripción con su tiempo (en segundos).
 export type Segmento = { inicio: number; fin: number; texto: string };
 
+export type Materia = { id: string; nombre: string; color: string };
+
 export type Sesion = {
   id: string;
+  materiaId?: string; // materia elegida (materia y color se guardan además como copia)
   materia: string;
   color: string;
   fechaISO: string; // fecha ISO, ej. "2026-11-21T10:00:00.000Z"

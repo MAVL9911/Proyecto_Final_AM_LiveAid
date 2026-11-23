@@ -14,6 +14,8 @@ export default function RootLayout() {
         }}
       >
         <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+        <Stack.Screen name="nueva-sesion" options={{ title: 'Nueva sesión', presentation: 'modal' }} />
+        <Stack.Screen name="materia/[id]" options={{ title: 'Materia', headerBackTitle: 'Materias' }} />
         <Stack.Screen name="en-vivo" options={{ headerShown: false, gestureEnabled: false }} />
         <Stack.Screen name="guardada" options={{ headerShown: false, gestureEnabled: false }} />
         <Stack.Screen

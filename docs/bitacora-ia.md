@@ -16,3 +16,4 @@ KeyboardAvoidingView evita que el teclado tape el campo de notas, que es de los 
 Claude Code construyó el servidor con /transcribir y /resumir, y yo lo probé con curl: transcripción real, tres tipos de resumen y tres casos de error.
 La prueba de instrucciones escondidas devolvió el error genérico; quedó sin confirmar la causa.
 La terminal de Windows dañó las tildes al mandar el texto, así que usé texto sin tildes para probar.
+leíste en voz alta la lista de pruebas, la transcripción quedó llena de órdenes y el resumen falló con 502, igual que con la frase de la pizza. Lo vas a diagnosticar con los códigos del servidor en lugar de adivinar. Esto es justo lo que te preguntarán en el minuto de criterio.

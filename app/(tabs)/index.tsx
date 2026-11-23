@@ -82,7 +82,7 @@ export default function Inicio() {
       </ScrollView>
 
       <Pressable
-        onPress={() => router.push('/en-vivo')}
+        onPress={() => router.push('/nueva-sesion')}
         style={({ pressed }) => [styles.boton, pressed && styles.botonPresionado]}
       >
         <Ionicons name="add" size={22} color={colors.sobrePrimario} />

@@ -12,13 +12,21 @@ export const colors = {
   azul: '#3B82F6',
   ambar: '#F59E0B',
   verde: '#22C55E',
+  rosa: '#EC4899',
   rojo: '#EF4444',
   sobrePrimario: '#FFFFFF', // texto sobre el color principal
   sombra: '#000000',
 };
 
 // Colores por materia (en orden)
-export const coloresMateria = [colors.primario, colors.morado, colors.azul, colors.ambar];
+export const coloresMateria = [
+  colors.primario,
+  colors.morado,
+  colors.azul,
+  colors.ambar,
+  colors.verde,
+  colors.rosa,
+];
 
 export const spacing = {
   xs: 4,

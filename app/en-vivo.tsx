@@ -1,19 +1,15 @@
 import { Ionicons } from '@expo/vector-icons';
-import { useRouter } from 'expo-router';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useEffect, useRef, useState } from 'react';
 import { Alert, BackHandler, Linking, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Ondas from '../src/components/Ondas';
 import { useCronometro } from '../src/hooks/useCronometro';
 import { useGrabadora } from '../src/hooks/useGrabadora';
-import { guardarSesion } from '../src/storage';
+import { guardarSesion, listarMaterias } from '../src/storage';
 import { transcribirSesion } from '../src/transcripcion';
-import { Sesion } from '../src/types';
-import { colors, coloresMateria, fonts, fontSizes, radius, spacing } from '../src/theme';
-
-// Luego vendrá de la materia elegida
-const MATERIA = 'Cálculo Diferencial e Integral';
-const COLOR_MATERIA = coloresMateria[0];
+import { Materia, Sesion } from '../src/types';
+import { colors, fonts, fontSizes, radius, spacing } from '../src/theme';
 
 function formatear(segundos: number): string {
   const m = Math.floor(segundos / 60);
@@ -23,6 +19,8 @@ function formatear(segundos: number): string {
 
 export default function EnVivo() {
   const router = useRouter();
+  const { materiaId } = useLocalSearchParams<{ materiaId?: string }>();
+  const [materia, setMateria] = useState<Materia | null>(null);
   const insets = useSafeAreaInsets();
   // El cronómetro empieza detenido: arranca solo cuando la grabación realmente inició
   const { segundos, corriendo, pausar, reanudar, obtenerSegundos } = useCronometro(false);
@@ -42,6 +40,20 @@ export default function EnVivo() {
     if (arrancado.current) return;
     arrancado.current = true;
     (async () => {
+      // Sin materia válida no se inicia ni el cronómetro ni la grabación
+      const materias = await listarMaterias();
+      const elegida = materiaId ? materias.find((m) => m.id === String(materiaId)) : undefined;
+      if (!elegida) {
+        Alert.alert(
+          'Elige una materia',
+          'Para comenzar una sesión primero elige una materia.',
+          [{ text: 'Aceptar', onPress: () => router.replace('/nueva-sesion') }],
+          { cancelable: false }
+        );
+        return;
+      }
+      setMateria(elegida);
+
       const resultado = await grabadora.iniciar();
       if (resultado === 'ok') {
         reanudar();
@@ -109,7 +121,7 @@ export default function EnVivo() {
   }
 
   function detener() {
-    if (!grabando) return;
+    if (!grabando || !materia) return;
     confirmar(
       '¿Detener la grabación?',
       async () => {
@@ -124,8 +136,9 @@ export default function EnVivo() {
 
         const sesion: Sesion = {
           id: Date.now().toString(),
-          materia: MATERIA,
-          color: COLOR_MATERIA,
+          materiaId: materia.id,
+          materia: materia.nombre,
+          color: materia.color,
           fechaISO: new Date().toISOString(),
           duracionSeg: duracion,
           // Sin audio no hay nada que transcribir: se guarda con error y mensaje claro
@@ -175,7 +188,7 @@ export default function EnVivo() {
       <View style={styles.encabezado}>
         <View style={styles.encabezadoTextos}>
           <Text style={styles.materia} numberOfLines={2}>
-            {MATERIA}
+            {materia?.nombre ?? ''}
           </Text>
           <View style={styles.etiqueta}>
             <View style={styles.punto} />
