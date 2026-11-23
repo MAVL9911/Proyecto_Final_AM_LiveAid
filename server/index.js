@@ -1,6 +1,8 @@
 require('dotenv').config();
 
+const crypto = require('crypto');
 const express = require('express');
+const rateLimit = require('express-rate-limit');
 const cors = require('cors');
 const multer = require('multer');
 
@@ -22,11 +24,20 @@ if (!process.env.ANTHROPIC_API_KEY) {
   process.exit(1);
 }
 
+if (!process.env.APP_KEY) {
+  console.error(
+    'Falta la variable APP_KEY. Agrégala en server/.env (puedes copiar server/.env.example) y vuelve a iniciar el servidor.'
+  );
+  process.exit(1);
+}
+
 const PORT = process.env.PORT || 3000;
 const GROQ_URL = 'https://api.groq.com/openai/v1/audio/transcriptions';
 const ANTHROPIC_URL = 'https://api.anthropic.com/v1/messages';
 
 const app = express();
+// Detrás de un proxy (Render, etc.) para que el límite use la IP real del cliente.
+app.set('trust proxy', 1);
 app.use(cors());
 // JSON de hasta 1 MB (solo aplica a peticiones JSON; /transcribir usa multer).
 app.use(express.json({ limit: '1mb' }));
@@ -37,11 +48,32 @@ const upload = multer({
   limits: { fileSize: 10 * 1024 * 1024 },
 });
 
+// Límite de peticiones por IP: 60 cada 10 minutos (solo /transcribir y /resumir).
+const limitador = rateLimit({
+  windowMs: 10 * 60 * 1000,
+  limit: 60,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'Demasiadas peticiones, intenta más tarde' },
+});
+
+// Exige el encabezado x-app-key igual a APP_KEY (comparación en tiempo constante).
+function exigirLlave(req, res, next) {
+  const recibida = req.get('x-app-key');
+  if (typeof recibida === 'string') {
+    const a = Buffer.from(recibida);
+    const b = Buffer.from(process.env.APP_KEY);
+    // timingSafeEqual lanza error si las longitudes difieren: se revisan antes.
+    if (a.length === b.length && crypto.timingSafeEqual(a, b)) return next();
+  }
+  return res.status(401).json({ error: 'No autorizado' });
+}
+
 app.get('/salud', (req, res) => {
   res.json({ ok: true });
 });
 
-app.post('/transcribir', upload.single('audio'), async (req, res) => {
+app.post('/transcribir', limitador, exigirLlave, upload.single('audio'), async (req, res) => {
   if (!req.file) {
     return res
       .status(400)
@@ -145,7 +177,7 @@ const PROMPTS_POR_TIPO = {
 
 const MAX_TOKENS_POR_TIPO = { resumen: 1024, explicacion: 1024, guia: 2048 };
 
-app.post('/resumir', async (req, res) => {
+app.post('/resumir', limitador, exigirLlave, async (req, res) => {
   const { transcripcion, tipo } = req.body || {};
 
   // "destacados" es opcional: si no es arreglo se ignora; solo se conservan

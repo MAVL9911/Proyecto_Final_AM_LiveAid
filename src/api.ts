@@ -3,6 +3,16 @@ import { Segmento } from './types';
 
 const TIMEOUT_MS = 60000;
 
+// Llave compartida con el backend (encabezado x-app-key).
+const APP_KEY = process.env.EXPO_PUBLIC_APP_KEY ?? '';
+
+// Mensajes claros para los códigos que manda la protección del servidor.
+function mensajeProteccion(estado: number): string | null {
+  if (estado === 401) return 'No autorizado: la app no tiene permiso para usar el servidor. Revisa la llave de acceso.';
+  if (estado === 429) return 'Demasiadas peticiones. Espera unos minutos e intenta de nuevo.';
+  return null;
+}
+
 // Diagnóstico: imprime SOLO datos técnicos, nunca el audio ni textos de transcripción.
 function registrarError(error: any, uri: string, estado?: number) {
   console.warn('[transcribirAudio]', {
@@ -20,6 +30,7 @@ function enviarAudio(uri: string): Promise<{ estado: number; cuerpo: string }> {
   return new Promise((resolve, reject) => {
     const xhr = new XMLHttpRequest();
     xhr.open('POST', `${API_URL}/transcribir`);
+    xhr.setRequestHeader('x-app-key', APP_KEY);
     xhr.timeout = TIMEOUT_MS;
     xhr.onload = () => resolve({ estado: xhr.status, cuerpo: xhr.responseText });
     xhr.onerror = () => reject(new Error('RED'));
@@ -68,6 +79,8 @@ export async function transcribirAudio(uri: string): Promise<{ texto: string; se
   if (resultado.estado < 200 || resultado.estado >= 300) {
     const detalle = typeof datos?.error === 'string' ? datos.error : 'El servidor respondió con un error.';
     registrarError(new Error(detalle), uri, resultado.estado);
+    const proteccion = mensajeProteccion(resultado.estado);
+    if (proteccion) throw new Error(proteccion);
     throw new Error(`Error del servidor (${resultado.estado}): ${detalle}`);
   }
 
@@ -102,7 +115,7 @@ export async function generarContenido(
   try {
     respuesta = await fetch(`${API_URL}/resumir`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', 'x-app-key': APP_KEY },
       body: JSON.stringify({ transcripcion, tipo, destacados }),
       signal: controlador.signal,
     });
@@ -123,6 +136,8 @@ export async function generarContenido(
     }
 
     if (!respuesta.ok) {
+      const proteccion = mensajeProteccion(respuesta.status);
+      if (proteccion) throw new Error(proteccion);
       const detalle = typeof datos?.error === 'string' ? datos.error : 'El servidor respondió con un error.';
       throw new Error(`Error del servidor (${respuesta.status}): ${detalle}`);
     }
